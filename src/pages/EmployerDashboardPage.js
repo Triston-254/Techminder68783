@@ -92,6 +92,7 @@ function EmployerDashboardPage() {
     loadJobs();
   }, [session]);
 
+
   const update = (field) => (e) => {
     const value = e.target.value;
     if (field === 'county') {
