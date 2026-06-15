@@ -22,20 +22,20 @@ function App() {
       <ThemeProvider>
         <BrowserRouter>
           <ToastProvider>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/choose-role" element={<ChooseRolePage />} />
-            <Route path="/employer-dashboard" element={<EmployerDashboardPage />} />
-            <Route path="/employer/profile" element={<EmployerProfilePage />} />
-            <Route path="/employer/settings" element={<EmployerSettingsPage />} />
-            <Route path="/job-seeker-dashboard" element={<JobSeekerDashboardPage />} />
-            <Route path="/job-seeker/profile" element={<SeekerProfilePage />} />
-            <Route path="/job-seeker/settings" element={<SeekerSettingsPage />} />
-          </Routes>
-          <ThemeFab />
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/choose-role" element={<ChooseRolePage />} />
+              <Route path="/employer-dashboard" element={<EmployerDashboardPage />} />
+              <Route path="/employer/profile" element={<EmployerProfilePage />} />
+              <Route path="/employer/settings" element={<EmployerSettingsPage />} />
+              <Route path="/job-seeker-dashboard" element={<JobSeekerDashboardPage />} />
+              <Route path="/job-seeker/profile" element={<SeekerProfilePage />} />
+              <Route path="/job-seeker/settings" element={<SeekerSettingsPage />} />
+            </Routes>
+            <ThemeFab />
           </ToastProvider>
         </BrowserRouter>
       </ThemeProvider>
