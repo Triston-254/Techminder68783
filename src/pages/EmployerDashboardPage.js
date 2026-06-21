@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmployerHeader from '../components/EmployerHeader';
+import RelativeTime from '../components/RelativeTime';
+import ShareJobButton from '../components/ShareJobButton';
+import SessionExpiredPrompt from '../components/SessionExpiredPrompt';
 import SiteFooter from '../components/SiteFooter';
 import JobApplicantsModal from '../components/JobApplicantsModal';
 import { useLanguage } from '../context/LanguageContext';
@@ -56,7 +59,7 @@ function jobToForm(job, lang = 'en') {
 function EmployerDashboardPage() {
   const { lang, page } = useLanguage();
   const { showToast } = useToast();
-  const { session, user, logout, ready } = useEmployerSession();
+  const { session, user, logout, ready, sessionExpired } = useEmployerSession();
   const [form, setForm] = useState(emptyForm);
   const [editingJob, setEditingJob] = useState(null);
   const [myJobs, setMyJobs] = useState([]);
@@ -458,10 +461,13 @@ function EmployerDashboardPage() {
                           {job.location}
                         </p>
                         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                          <span className="small text-muted">
-                            {page.employerPostedOn}{' '}
-                            {new Date(job.createdAt).toLocaleDateString(lang === 'sw' ? 'sw-KE' : 'en-KE')}
-                          </span>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="small text-muted">
+                              {page.employerPostedOn}{' '}
+                              <RelativeTime value={job.createdAt} lang={lang} />
+                            </span>
+                            <ShareJobButton job={job} page={page} showLabel />
+                          </div>
                           <div className="d-flex flex-wrap gap-2">
                             <button
                               type="button"
@@ -535,6 +541,7 @@ function EmployerDashboardPage() {
       />
 
       <SiteFooter compact />
+      {sessionExpired && <SessionExpiredPrompt />}
     </div>
   );
 }

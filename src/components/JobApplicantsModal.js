@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
+import RelativeTime from './RelativeTime';
 import UserAvatar from './UserAvatar';
 import SeekerProfileModal from './SeekerProfileModal';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import {
   applicationStatusLabel,
-  formatJobPostedAt,
   getJobApplicants,
   updateApplicationStatus,
 } from '../utils/jobs';
@@ -125,7 +125,7 @@ function JobApplicantsModal({ jobId, jobTitle, open, onClose, onCountChange }) {
                         <h3 className="job-applicant-name">{applicant.seekerName}</h3>
                         <p className="text-muted small mb-0">
                           {page.employerApplicantApplied}{' '}
-                          {formatJobPostedAt(applicant.createdAt, lang)}
+                          <RelativeTime value={applicant.createdAt} lang={lang} />
                         </p>
                       </div>
                     </div>

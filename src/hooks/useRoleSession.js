@@ -1,42 +1,64 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SESSION_EXPIRED_EVENT } from '../components/SessionExpiredPrompt';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { getDashboardPath } from '../utils/dashboard';
 import { authAPI } from '../utils/api';
+import {
+  clearSessionStorage,
+  isSessionExpired,
+  touchSessionActivity,
+} from '../utils/sessionActivity';
+
+function readStoredSession() {
+  const raw = localStorage.getItem('sjk_session');
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    localStorage.removeItem('sjk_session');
+    return null;
+  }
+}
 
 export function useRoleSession(expectedRole) {
   const navigate = useNavigate();
   const { page } = useLanguage();
   const { showToast } = useToast();
   const [session, setSession] = useState(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  const refresh = () => {
-    const raw = localStorage.getItem('sjk_session');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
+  const markExpiredIfNeeded = useCallback((parsed) => {
+    if (!isSessionExpired()) return false;
     setSession(parsed);
+    setSessionExpired(true);
+    setReady(true);
+    return true;
+  }, []);
+
+  const refresh = useCallback(() => {
+    const parsed = readStoredSession();
+    if (!parsed) return null;
+    if (markExpiredIfNeeded(parsed)) return parsed;
+    setSession(parsed);
+    setSessionExpired(false);
     return parsed;
-  };
+  }, [markExpiredIfNeeded]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function verifySession() {
-      const raw = localStorage.getItem('sjk_session');
-      if (!raw) {
+      const parsed = readStoredSession();
+      if (!parsed) {
         navigate('/login', { replace: true });
         return;
       }
 
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        localStorage.removeItem('sjk_session');
-        navigate('/login', { replace: true });
-        return;
-      }
+      if (markExpiredIfNeeded(parsed)) return;
 
       try {
         const result = await authAPI.me();
@@ -57,6 +79,7 @@ export function useRoleSession(expectedRole) {
           profilePicture: result.user.profilePicture || parsed.profilePicture || null,
         };
         localStorage.setItem('sjk_session', JSON.stringify(syncedSession));
+        touchSessionActivity();
 
         if (result.user.role !== expectedRole) {
           navigate(getDashboardPath(result.user.role), { replace: true });
@@ -64,6 +87,8 @@ export function useRoleSession(expectedRole) {
         }
 
         setSession(syncedSession);
+        setSessionExpired(false);
+        setReady(true);
       } catch {
         if (cancelled) return;
         if (parsed.role !== expectedRole) {
@@ -71,6 +96,9 @@ export function useRoleSession(expectedRole) {
           return;
         }
         setSession(parsed);
+        setSessionExpired(false);
+        setReady(true);
+        touchSessionActivity();
       }
     }
 
@@ -78,14 +106,46 @@ export function useRoleSession(expectedRole) {
     return () => {
       cancelled = true;
     };
-  }, [navigate, expectedRole]);
+  }, [navigate, expectedRole, markExpiredIfNeeded]);
+
+  useEffect(() => {
+    const handleExpired = () => {
+      const parsed = readStoredSession();
+      if (!parsed) return;
+      setSession(parsed);
+      setSessionExpired(true);
+      setReady(true);
+    };
+
+    const handleFocus = () => {
+      const parsed = readStoredSession();
+      if (parsed && isSessionExpired()) handleExpired();
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, []);
 
   const logout = async () => {
     await authAPI.logout();
-    localStorage.removeItem('sjk_session');
+    clearSessionStorage();
     showToast(page.employerLogoutSuccess);
     navigate('/login', { state: { fromLogout: true } });
   };
 
-  return { session, refresh, logout, ready: !!session };
+  return {
+    session,
+    user: session,
+    sessionExpired,
+    refresh,
+    logout,
+    ready,
+  };
 }

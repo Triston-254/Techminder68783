@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import AuthEmailInput from '../components/AuthEmailInput';
 import AuthLayout from '../components/AuthLayout';
 import { useLanguage } from '../context/LanguageContext';
 import { authAPI } from '../utils/api';
+import { isValidEmail } from '../utils/validation';
 
 function ResetSuccessCheck() {
   return (
@@ -25,11 +27,28 @@ function ResetPasswordPage() {
   const [resetComplete, setResetComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
 
   const isConfirmMode = !!token;
 
+  const showError = (message) => {
+    setErrorKey((current) => current + 1);
+    setError(message);
+  };
+
+  const clearError = () => {
+    setError((current) => (current ? '' : current));
+  };
+
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
+    if (!isValidEmail(email)) {
+      showError(page.authEmailInvalid);
+      return;
+    }
+
     setLoading(true);
     try {
       await authAPI.requestPasswordReset({ email });
@@ -45,11 +64,11 @@ function ResetPasswordPage() {
     e.preventDefault();
     setError('');
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+      showError('Password must be at least 8 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+      showError('Passwords do not match.');
       return;
     }
     setLoading(true);
@@ -58,10 +77,10 @@ function ResetPasswordPage() {
       if (result.success) {
         setResetComplete(true);
       } else {
-        setError(result.message || 'Reset failed');
+        showError(result.message || 'Reset failed');
       }
     } catch {
-      setError('Connection error.');
+      showError('Connection error.');
     } finally {
       setLoading(false);
     }
@@ -81,7 +100,6 @@ function ResetPasswordPage() {
         </div>
       ) : isConfirmMode ? (
         <form onSubmit={handleConfirmSubmit} className="auth-form" noValidate>
-          {error && <div className="alert alert-danger auth-alert rounded-3 py-2">{error}</div>}
           <div className="mb-3">
             <label htmlFor="reset-new-password" className="form-label auth-label">New Password</label>
             <input
@@ -89,8 +107,11 @@ function ResetPasswordPage() {
               type="password"
               className="form-control form-control-lg auth-input"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="New password"
+              onChange={(e) => {
+                clearError();
+                setNewPassword(e.target.value);
+              }}
+              placeholder={page.authPlaceholderPassword}
               required
               autoComplete="new-password"
               minLength={8}
@@ -103,13 +124,21 @@ function ResetPasswordPage() {
               type="password"
               className="form-control form-control-lg auth-input"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm password"
+              onChange={(e) => {
+                clearError();
+                setConfirmPassword(e.target.value);
+              }}
+              placeholder={page.authPlaceholderPassword}
               required
               autoComplete="new-password"
               minLength={8}
             />
           </div>
+          {error && (
+            <div key={errorKey} className="alert alert-danger auth-alert auth-alert-error rounded-3 py-2 mb-3" role="alert">
+              {error}
+            </div>
+          )}
           <button type="submit" className="btn btn-warning btn-lg w-100 auth-submit-btn rounded-pill fw-semibold" disabled={loading}>
             {loading ? '...' : 'Reset Password'}
           </button>
@@ -129,19 +158,24 @@ function ResetPasswordPage() {
         </div>
       ) : (
         <form onSubmit={handleRequestSubmit} className="auth-form" noValidate>
-          <div className="mb-4">
-            <label htmlFor="reset-email" className="form-label auth-label">{page.resetEmail}</label>
-            <input
-              id="reset-email"
-              type="email"
-              className="form-control form-control-lg auth-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              autoComplete="email"
-            />
-          </div>
+          <AuthEmailInput
+            id="reset-email"
+            label={page.resetEmail}
+            value={email}
+            onChange={(e) => {
+              clearError();
+              setEmail(e.target.value);
+            }}
+            placeholder={page.authPlaceholderEmailExample}
+            required
+            autoComplete="email"
+            className="mb-4"
+          />
+          {error && (
+            <div key={errorKey} className="alert alert-danger auth-alert auth-alert-error rounded-3 py-2 mb-3" role="alert">
+              {error}
+            </div>
+          )}
           <button type="submit" className="btn btn-warning btn-lg w-100 auth-submit-btn rounded-pill fw-semibold" disabled={loading}>
             {loading ? '...' : page.resetButton}
           </button>

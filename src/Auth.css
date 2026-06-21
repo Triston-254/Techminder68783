@@ -153,6 +153,63 @@
   position: relative;
 }
 
+.auth-email-wrap {
+  position: relative;
+}
+
+.auth-email-valid-check {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  pointer-events: none;
+}
+
+.auth-email-invalid-check {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #fff;
+  cursor: help;
+}
+
+.auth-input.auth-input-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 0.2rem rgba(220, 38, 38, 0.12);
+}
+
+.auth-input.auth-input-invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 0.2rem rgba(220, 38, 38, 0.18);
+}
+
+.auth-email-error-text {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.auth-input.auth-input-with-check {
+  padding-right: 2.75rem;
+}
+
 .auth-password-toggle {
   position: absolute;
   right: 0.75rem;
@@ -253,6 +310,22 @@
 .auth-alert {
   font-size: 0.875rem;
   border: none;
+}
+
+.auth-alert-error {
+  animation: authAlertIn 0.3s ease;
+}
+
+@keyframes authAlertIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .auth-success-box {

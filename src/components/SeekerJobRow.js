@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { applicationStatusLabel, formatJobPostedAt } from '../utils/jobs';
+import { applicationStatusLabel } from '../utils/jobs';
+import RelativeTime from './RelativeTime';
+import ShareJobButton from './ShareJobButton';
 import UserAvatar from './UserAvatar';
 
 function LikeIcon() {
@@ -104,9 +106,13 @@ function SeekerJobRow({
         </div>
         {job.createdAt && (
           <p className="small text-muted mb-0">
-            {page.seekerPostedOn} {formatJobPostedAt(job.createdAt, lang)}
+            {page.seekerPostedOn} <RelativeTime value={job.createdAt} lang={lang} />
           </p>
         )}
+      </div>
+
+      <div className="seeker-job-share">
+        <ShareJobButton job={job} page={page} showLabel />
       </div>
 
       <div className="seeker-job-reactions">

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import AuthEmailInput from '../components/AuthEmailInput';
 import AuthLayout from '../components/AuthLayout';
+import LegalDialog from '../components/LegalDialog';
 import { useLanguage } from '../context/LanguageContext';
 import { authAPI } from '../utils/api';
 import { getPasswordChecks, isPasswordValid, validatePhone } from '../utils/passwordRules';
+import { isValidEmail } from '../utils/validation';
 import { setPendingWelcome } from '../utils/notifications';
 
 function SignupPage() {
@@ -12,8 +15,11 @@ function SignupPage() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
 
   useEffect(() => {
     const role = sessionStorage.getItem('sjk_selected_role');
@@ -24,7 +30,19 @@ function SignupPage() {
     setSelectedRole(role);
   }, [navigate]);
 
-  const update = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const showError = (message) => {
+    setErrorKey((current) => current + 1);
+    setError(message);
+  };
+
+  const clearError = () => {
+    setError((current) => (current ? '' : current));
+  };
+
+  const update = (field) => (e) => {
+    clearError();
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
   const focusField = (e) => e.target.focus();
 
   const roleLabel = selectedRole === 'employer' ? page.roleEmployerTitle : page.roleSeekerTitle;
@@ -40,13 +58,23 @@ function SignupPage() {
     e.preventDefault();
     setError('');
 
+    if (!isValidEmail(form.email)) {
+      showError(page.authEmailInvalid);
+      return;
+    }
+
     if (!isPasswordValid(form.password)) {
-      setError(page.signupPasswordInvalid);
+      showError(page.signupPasswordInvalid);
       return;
     }
 
     if (form.phone && !validatePhone(form.phone)) {
-      setError(page.signupPhoneInvalid || 'Enter a valid phone number');
+      showError(page.signupPhoneInvalid || 'Enter a valid phone number');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      showError(page.signupTermsRequired);
       return;
     }
 
@@ -62,10 +90,10 @@ function SignupPage() {
         sessionStorage.removeItem('sjk_selected_role');
         navigate('/login', { state: { signupSuccess: true } });
       } else {
-        setError(result.message || 'Signup failed');
+        showError(result.message || 'Signup failed');
       }
     } catch {
-      setError('Connection error. Please try again.');
+      showError('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -98,26 +126,22 @@ function SignupPage() {
             value={form.name}
             onChange={update('name')}
             onMouseEnter={focusField}
-            placeholder="Input your name"
+            placeholder={page.authPlaceholderName}
             required
             autoComplete="name"
           />
         </div>
 
-        <div className="mb-3">
-          <label htmlFor="signup-email" className="form-label auth-label">{page.signupEmail}</label>
-          <input
-            id="signup-email"
-            type="email"
-            className="form-control form-control-lg auth-input"
-            value={form.email}
-            onChange={update('email')}
-            onMouseEnter={focusField}
-            placeholder="Input email"
-            required
-            autoComplete="email"
-          />
-        </div>
+        <AuthEmailInput
+          id="signup-email"
+          label={page.signupEmail}
+          value={form.email}
+          onChange={update('email')}
+          onFocus={focusField}
+          placeholder={page.authPlaceholderEmail}
+          required
+          autoComplete="email"
+        />
 
         <div className="mb-3">
           <label htmlFor="signup-phone" className="form-label auth-label">{page.signupPhone}</label>
@@ -143,7 +167,7 @@ function SignupPage() {
               value={form.password}
               onChange={update('password')}
               onMouseEnter={focusField}
-              placeholder="Input password"
+              placeholder={page.authPlaceholderPassword}
               required
               autoComplete="new-password"
               minLength={8}
@@ -189,17 +213,55 @@ function SignupPage() {
           ))}
         </ul>
 
-        <button type="submit" className="btn btn-warning btn-lg w-100 auth-submit-btn rounded-pill fw-semibold mt-2" disabled={loading}>
+        <div className="signup-terms-check mb-3">
+          <label className="signup-terms-label" htmlFor="signup-terms">
+            <input
+              id="signup-terms"
+              type="checkbox"
+              className="signup-terms-input"
+              checked={agreedToTerms}
+              onChange={(event) => {
+                clearError();
+                setAgreedToTerms(event.target.checked);
+              }}
+            />
+            <span className="signup-terms-text">
+              {page.signupTermsAgree}{' '}
+              <button
+                type="button"
+                className="signup-terms-link"
+                onClick={() => setShowTermsDialog(true)}
+              >
+                {page.footerTerms}
+              </button>
+            </span>
+          </label>
+        </div>
+
+        {error && (
+          <div key={errorKey} className="alert alert-danger auth-alert auth-alert-error rounded-3 py-2 mb-3" role="alert">
+            {error}
+          </div>
+        )}
+
+        <button type="submit" className="btn btn-warning btn-lg w-100 auth-submit-btn rounded-pill fw-semibold mt-2" disabled={loading || !agreedToTerms}>
           {loading ? '...' : page.signupButton}
         </button>
-
-        {error && <div className="alert alert-danger auth-alert rounded-3 py-2 mt-3">{error}</div>}
 
         <p className="text-center text-muted mt-4 mb-0 auth-footer-text">
           {page.signupHasAccount}{' '}
           <Link to="/login" className="auth-link">{page.signupLoginLink}</Link>
         </p>
       </form>
+
+      <LegalDialog
+        title={page.footerTerms}
+        updated={page.legalLastUpdated}
+        sections={page.termsSections}
+        open={showTermsDialog}
+        onClose={() => setShowTermsDialog(false)}
+        closeLabel={page.legalClose}
+      />
     </AuthLayout>
   );
 }

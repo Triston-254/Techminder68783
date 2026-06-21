@@ -1,4 +1,5 @@
 import ProfileWorkspace from '../components/ProfileWorkspace';
+import SessionExpiredPrompt from '../components/SessionExpiredPrompt';
 import SeekerHeader from '../components/SeekerHeader';
 import SiteFooter from '../components/SiteFooter';
 import { useLanguage } from '../context/LanguageContext';
@@ -7,7 +8,7 @@ import '../App.css';
 
 function SeekerProfilePage() {
   const { page } = useLanguage();
-  const { session, user, refresh, logout, ready } = useSeekerSession();
+  const { session, user, refresh, logout, ready, sessionExpired } = useSeekerSession();
 
   if (!ready) return null;
 
@@ -26,6 +27,7 @@ function SeekerProfilePage() {
       </main>
 
       <SiteFooter compact />
+      {sessionExpired && <SessionExpiredPrompt />}
     </div>
   );
 }

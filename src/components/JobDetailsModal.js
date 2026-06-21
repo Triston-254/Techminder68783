@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from './ConfirmDialog';
+import RelativeTime from './RelativeTime';
+import ShareJobButton from './ShareJobButton';
 import UserAvatar from './UserAvatar';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -9,7 +11,6 @@ import {
   applicationStatusLabel,
   applyToJob,
   countApplyWords,
-  formatJobPostedAt,
   getJobById,
   reactToJob,
   toggleSaveJob,
@@ -317,9 +318,13 @@ function JobDetailsModal({
               </div>
               {job.createdAt && (
                 <p className="small text-muted mb-0">
-                  {page.seekerPostedOn} {formatJobPostedAt(job.createdAt, lang)}
+                  {page.seekerPostedOn} <RelativeTime value={job.createdAt} lang={lang} />
                 </p>
               )}
+            </div>
+
+            <div className="seeker-job-share">
+              <ShareJobButton job={job} page={page} showLabel />
             </div>
 
             {job.description && (

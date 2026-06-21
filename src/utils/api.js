@@ -39,6 +39,16 @@ async function notificationsRequest(action, data = {}) {
   return parseResponse(response);
 }
 
+async function adminRequest(action, data = {}) {
+  const response = await fetch(`${API_BASE}/admin.php?action=${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ action, ...data }),
+  });
+  return parseResponse(response);
+}
+
 export const authAPI = {
   signup: (data) => apiRequest('signup', data),
   login: (data) => apiRequest('login', data),
@@ -76,6 +86,31 @@ export const notificationsAPI = {
   archive: (id) => notificationsRequest('archive', { id }),
 };
 
+export const adminAPI = {
+  stats: () => adminRequest('stats', {}),
+  listUsers: (data = {}) => adminRequest('list_users', data),
+  listJobs: (data = {}) => adminRequest('list_jobs', data),
+  listApplications: (data = {}) => adminRequest('list_applications', data),
+  listContactMessages: (data = {}) => adminRequest('list_contact_messages', data),
+  updateContactMessageStatus: (data) => adminRequest('update_contact_message_status', data),
+  deleteContactMessage: (id) => adminRequest('delete_contact_message', { id }),
+  getJob: (jobId) => adminRequest('get_job', { jobId }),
+  getJobApplicants: (jobId) => adminRequest('get_job_applicants', { jobId }),
+  sendNotification: (data) => adminRequest('send_notification', data),
+  updateUser: (data) => adminRequest('update_user', data),
+  deleteUser: (id) => adminRequest('delete_user', { id }),
+  manageUser: (data) => adminRequest('manage_user', data),
+};
+
+export const adminJobsAPI = {
+  closeJob: (data) => fetch(`${API_BASE}/admin_job_actions.php?action=admin_close_job`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  }).then(parseResponse),
+};
+
 async function subscriptionsRequest(action, data = {}) {
   const response = await fetch(`${API_BASE}/subscriptions.php?action=${action}`, {
     method: 'POST',
@@ -88,4 +123,33 @@ async function subscriptionsRequest(action, data = {}) {
 
 export const subscriptionsAPI = {
   subscribe: (email) => subscriptionsRequest('subscribe', { email }),
+};
+
+async function chatRequest(action, data = {}) {
+  const response = await fetch(`${API_BASE}/chat.php?action=${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ action, ...data }),
+  });
+  return parseResponse(response);
+}
+
+export const chatAPI = {
+  send: (data) => chatRequest('send', data),
+  context: () => chatRequest('context', {}),
+};
+
+async function contactRequest(action, data = {}) {
+  const response = await fetch(`${API_BASE}/contact.php?action=${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ action, ...data }),
+  });
+  return parseResponse(response);
+}
+
+export const contactAPI = {
+  sendMessage: (data) => contactRequest('send_message', data),
 };

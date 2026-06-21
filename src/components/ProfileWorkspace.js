@@ -52,6 +52,7 @@ function ProfileWorkspace({ session, user, refresh }) {
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
   const [passwordError, setPasswordError] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const profilePicture = user?.profilePicture || session?.profilePicture;
   const phone = user?.phone || session?.phone || '-';
@@ -94,9 +95,15 @@ function ProfileWorkspace({ session, user, refresh }) {
     e.target.value = '';
   };
 
+  const handlePasswordChange = (field) => (e) => {
+    setPasswordSuccess(false);
+    setPasswordForm((p) => ({ ...p, [field]: e.target.value }));
+  };
+
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setPasswordError('');
+    setPasswordSuccess(false);
 
     if (passwordForm.next !== passwordForm.confirm) {
       setPasswordError(page.employerPasswordMismatch);
@@ -113,6 +120,7 @@ function ProfileWorkspace({ session, user, refresh }) {
       if (result.success) {
         showToast(page.employerPasswordSuccess);
         setPasswordForm({ current: '', next: '', confirm: '' });
+        setPasswordSuccess(true);
       } else {
         setPasswordError(result.message?.includes('Current password') ? page.employerPasswordWrong : page.signupPasswordHint);
       }
@@ -168,7 +176,10 @@ function ProfileWorkspace({ session, user, refresh }) {
               key={item.key}
               type="button"
               className={`profile-sidebar-link${activeSection === item.key ? ' profile-sidebar-link-active' : ''}`}
-              onClick={() => setActiveSection(item.key)}
+              onClick={() => {
+                setActiveSection(item.key);
+                if (item.key !== 'password') setPasswordSuccess(false);
+              }}
             >
               <span className="profile-sidebar-link-icon">{item.icon}</span>
               {item.label}
@@ -226,6 +237,21 @@ function ProfileWorkspace({ session, user, refresh }) {
         {activeSection === 'password' && (
           <form className="profile-password-form" onSubmit={handlePasswordSubmit} noValidate>
             {passwordError && <div className="alert alert-danger py-2 small mb-3">{passwordError}</div>}
+            {passwordSuccess && (
+              <div className="profile-password-success-check mb-3" role="status" aria-live="polite">
+                <label className="profile-password-success-label">
+                  <input
+                    type="checkbox"
+                    className="profile-password-success-input"
+                    checked
+                    readOnly
+                    tabIndex={-1}
+                    aria-label={page.employerPasswordSuccessCheck}
+                  />
+                  <span className="profile-password-success-text">{page.employerPasswordSuccessCheck}</span>
+                </label>
+              </div>
+            )}
             <div className="mb-3">
               <label className="profile-form-label" htmlFor="profile-current-password">
                 {page.employerCurrentPassword}
@@ -235,7 +261,7 @@ function ProfileWorkspace({ session, user, refresh }) {
                 type="password"
                 className="form-control profile-form-input"
                 value={passwordForm.current}
-                onChange={(e) => setPasswordForm((p) => ({ ...p, current: e.target.value }))}
+                onChange={handlePasswordChange('current')}
                 required
                 autoComplete="current-password"
               />
@@ -249,7 +275,7 @@ function ProfileWorkspace({ session, user, refresh }) {
                 type="password"
                 className="form-control profile-form-input"
                 value={passwordForm.next}
-                onChange={(e) => setPasswordForm((p) => ({ ...p, next: e.target.value }))}
+                onChange={handlePasswordChange('next')}
                 required
                 minLength={8}
                 autoComplete="new-password"
@@ -264,7 +290,7 @@ function ProfileWorkspace({ session, user, refresh }) {
                 type="password"
                 className="form-control profile-form-input"
                 value={passwordForm.confirm}
-                onChange={(e) => setPasswordForm((p) => ({ ...p, confirm: e.target.value }))}
+                onChange={handlePasswordChange('confirm')}
                 required
                 minLength={8}
                 autoComplete="new-password"

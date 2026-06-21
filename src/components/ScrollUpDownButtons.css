@@ -1,0 +1,52 @@
+.scroll-up-down{
+  position:fixed;
+  right:20px;
+  bottom:130px;
+  z-index:1500;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  transition:opacity 180ms ease;
+  pointer-events:none;
+}
+
+
+.scroll-up-down-btn{
+  will-change: transform, opacity;
+}
+
+
+.scroll-up-down-btn{
+  width:44px;
+  height:44px;
+  border-radius:999px;
+  border:none;
+  cursor:pointer;
+  pointer-events:auto;
+  background:linear-gradient(135deg, #f97316, #ea580c);
+  color:#fff;
+  box-shadow:0 10px 28px rgba(234,88,12,0.35);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  font-weight:800;
+  transition:transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+}
+
+.scroll-up-down-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 14px 36px rgba(234,88,12,0.45);
+}
+
+.scroll-up-down-btn.is-hidden{
+  visibility:hidden;
+  opacity:0;
+  transform:translateY(6px);
+  pointer-events:none;
+}
+
+@media (max-width: 767px){
+  .scroll-up-down{ right:14px; bottom:88px; }
+}
+

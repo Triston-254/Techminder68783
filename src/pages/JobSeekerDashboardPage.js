@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import SeekerHeader from '../components/SeekerHeader';
@@ -6,7 +6,9 @@ import SiteFooter from '../components/SiteFooter';
 import JobDetailsModal from '../components/JobDetailsModal';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
+import SessionExpiredPrompt from '../components/SessionExpiredPrompt';
 import { useSeekerSession } from '../hooks/useSeekerSession';
+import RelativeTime from '../components/RelativeTime';
 import SeekerJobRow from '../components/SeekerJobRow';
 import { categories } from '../data/landingData';
 import { formatJobLocation, getAreasForCounty } from '../data/kenyaLocations';
@@ -15,7 +17,6 @@ import {
   JOB_TYPES,
   applicationStatusLabel,
   filterJobs,
-  formatJobPostedAt,
   formatStatCount,
   getAllJobs,
   getMyApplications,
@@ -29,7 +30,7 @@ import '../App.css';
 function JobSeekerDashboardPage() {
   const { lang, page } = useLanguage();
   const { showToast } = useToast();
-  const { session, logout, ready } = useSeekerSession();
+  const { session, logout, ready, sessionExpired } = useSeekerSession();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('browse');
   const [jobs, setJobs] = useState([]);
@@ -46,27 +47,23 @@ function JobSeekerDashboardPage() {
   const [openApplyOnLoad, setOpenApplyOnLoad] = useState(false);
   const [withdrawingId, setWithdrawingId] = useState(null);
   const [withdrawTarget, setWithdrawTarget] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadJobs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const nextJobs = await getAllJobs();
+      setJobs(nextJobs);
+    } catch {
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    const loadJobs = async () => {
-      setLoading(true);
-      try {
-        const nextJobs = await getAllJobs();
-        if (active) setJobs(nextJobs);
-      } catch {
-        if (active) setJobs([]);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
     loadJobs();
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [loadJobs]);
 
   useEffect(() => {
     if (!ready || !location.state?.jobId) return;
@@ -140,6 +137,20 @@ function JobSeekerDashboardPage() {
       keyword: searchQuery.trim(),
       location: locationFilter,
     });
+  };
+
+  const handleRefresh = async () => {
+    setSearchQuery('');
+    setSearchCounty('');
+    setSearchArea('');
+    setActiveSearch({ keyword: '', location: '' });
+    setRefreshing(true);
+    try {
+      await loadJobs();
+      showToast(page.seekerJobsRefreshed);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const updateJobInLists = (updatedJob) => {
@@ -231,6 +242,7 @@ function JobSeekerDashboardPage() {
   const isBrowseTab = activeTab === 'browse';
   const isSavedTab = activeTab === 'saved';
   const isApplicationsTab = activeTab === 'applications';
+  const hasActiveSearch = Boolean(activeSearch.keyword || activeSearch.location);
   const listLoading = isBrowseTab ? loading : (isSavedTab ? savedLoading : applicationsLoading);
   const displayedJobs = isBrowseTab ? filteredJobs : savedJobs;
 
@@ -329,7 +341,7 @@ function JobSeekerDashboardPage() {
                     ))}
                   </select>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <label className="form-label employer-label mb-1" htmlFor="seeker-area-search">
                     {page.employerArea}
                   </label>
@@ -348,12 +360,41 @@ function JobSeekerDashboardPage() {
                     ))}
                   </select>
                 </div>
-                <div className="col-md-2 d-grid">
-                  <button type="submit" className="btn btn-warning fw-semibold rounded-pill py-2">
-                    {page.heroButton}
-                  </button>
+                <div className="col-md-3">
+                  <span className="form-label employer-label mb-1 d-none d-md-block" aria-hidden="true">&nbsp;</span>
+                  <div className="seeker-search-actions d-flex gap-2">
+                    <button
+                      type="submit"
+                      className="btn btn-warning fw-semibold rounded-pill flex-grow-1 py-2"
+                      disabled={loading || refreshing}
+                    >
+                      {page.heroButton}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary fw-semibold rounded-pill py-2 seeker-refresh-btn"
+                      onClick={handleRefresh}
+                      disabled={loading || refreshing}
+                      aria-label={page.seekerRefreshJobs}
+                      title={page.seekerRefreshJobs}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                        <path d="M21 3v6h-6" />
+                      </svg>
+                      <span className="seeker-refresh-label">{page.seekerRefreshJobs}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+              {hasActiveSearch && (
+                <p className="seeker-search-active-note text-muted small mb-0 mt-3">
+                  {page.seekerSearchFiltered}{' '}
+                  <button type="button" className="seeker-clear-search-link" onClick={handleRefresh}>
+                    {page.seekerClearSearch}
+                  </button>
+                </p>
+              )}
             </form>
           )}
 
@@ -392,7 +433,8 @@ function JobSeekerDashboardPage() {
 
                     <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                       <span className="small text-muted">
-                        {page.seekerAppliedOn} {formatJobPostedAt(application.createdAt, lang)}
+                        {page.seekerAppliedOn}{' '}
+                        <RelativeTime value={application.createdAt} lang={lang} />
                       </span>
                       <div className="d-flex flex-wrap gap-2">
                         <button
@@ -424,7 +466,15 @@ function JobSeekerDashboardPage() {
           ) : isBrowseTab && filteredJobs.length === 0 ? (
             <div className="employer-empty-state text-center py-5">
               <div className="employer-empty-icon mb-3">🔍</div>
-              <p className="text-muted mb-0">{page.seekerSearchNoResults}</p>
+              <p className="text-muted mb-3">{page.seekerSearchNoResults}</p>
+              <button
+                type="button"
+                className="btn btn-outline-warning rounded-pill px-4 fw-semibold"
+                onClick={handleRefresh}
+                disabled={loading || refreshing}
+              >
+                {page.seekerClearSearch}
+              </button>
             </div>
           ) : isSavedTab && savedJobs.length === 0 ? (
             <div className="employer-empty-state text-center py-5">
@@ -480,6 +530,7 @@ function JobSeekerDashboardPage() {
       />
 
       <SiteFooter compact />
+      {sessionExpired && <SessionExpiredPrompt />}
     </div>
   );
 }

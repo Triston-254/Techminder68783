@@ -71,7 +71,8 @@ function SiteFooter({ compact = false }) {
                     {page.brand}
                   </h5>
                 </Link>
-                <p className="footer-tagline mb-3">{page.footerTagline}</p>
+                <p className="footer-tagline mb-2">{page.footerTagline}</p>
+                <p className="footer-subtagline mb-3">{page.footerSubtagline}</p>
                 <SocialLinks />
               </div>
               <div className="col-lg-5 text-lg-end">

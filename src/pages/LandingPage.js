@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import '../App.css';
 import AppNavbar from '../components/AppNavbar';
 import JobDetailsModal from '../components/JobDetailsModal';
+import LandingBanner from '../components/LandingBanner';
+import LandingLegalSection from '../components/LandingLegalSection';
+import { OPEN_COOKIES_EVENT } from '../components/CookieConsentBanner';
 import PromoSlider from '../components/PromoSlider';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +19,36 @@ import {
 import { formatJobLocation, getAreasForCounty } from '../data/kenyaLocations';
 import { COUNTIES, filterJobs, formatStatCount, getAllJobs, getPlatformStats } from '../utils/jobs';
 import { subscriptionsAPI } from '../utils/api';
+import { contactAPI } from '../utils/api';
+import { isValidEmail } from '../utils/validation';
+
+function ContactSuccessBox({ page, onDone }) {
+  const [hiding, setHiding] = useState(false);
+
+  useEffect(() => {
+    const hideTimer = window.setTimeout(() => setHiding(true), 2600);
+    const doneTimer = window.setTimeout(onDone, 3200);
+    return () => {
+      window.clearTimeout(hideTimer);
+      window.clearTimeout(doneTimer);
+    };
+  }, [onDone]);
+
+  return (
+    <div className={`seeker-apply-success-box contact-success-box${hiding ? ' is-hiding' : ''}`} role="status">
+      <div className="seeker-apply-success-check-lg" aria-hidden="true">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path className="seeker-apply-success-check-path" d="M20 6 9 17l-5-5" />
+        </svg>
+      </div>
+      <h3 className="seeker-apply-success-box-title">{page.contactFormSuccessTitle}</h3>
+      <div className="seeker-apply-success-line-track" aria-hidden="true">
+        <span className="seeker-apply-success-line" />
+      </div>
+      <p className="seeker-apply-success-box-message mb-0">{page.contactFormSuccessMessage}</p>
+    </div>
+  );
+}
 
 function JobAlertSuccessBox({ page, status, onDone }) {
   const copy = (() => {
@@ -51,6 +84,7 @@ function LandingPage() {
   const { lang, setLang, page } = useLanguage();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [translateDirection, setTranslateDirection] = useState('en2sw');
   const [sourceText, setSourceText] = useState('Type English text here to translate into Kiswahili.');
   const [translatedText, setTranslatedText] = useState('');
@@ -63,11 +97,18 @@ function LandingPage() {
   const [alertLoading, setAlertLoading] = useState(false);
   const [alertSubscribeSuccess, setAlertSubscribeSuccess] = useState(false);
   const [alertSuccessStatus, setAlertSuccessStatus] = useState('subscribed');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
+  const [contactError, setContactError] = useState('');
   const [liveJobs, setLiveJobs] = useState([]);
   const [liveStats, setLiveStats] = useState({ jobs: 0, employers: 0, seekers: 0, counties: 47 });
   const [jobsLoading, setJobsLoading] = useState(true);
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [openApplyOnSelect, setOpenApplyOnSelect] = useState(false);
+  const [activeLegalSection, setActiveLegalSection] = useState(null);
 
   const currentYear = new Date().getFullYear();
 
@@ -94,6 +135,13 @@ function LandingPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const jobId = searchParams.get('job');
+    if (jobId) {
+      setSelectedJobId(jobId);
+    }
+  }, [searchParams]);
 
   const filteredJobs = useMemo(
     () => filterJobs(liveJobs, activeSearch),
@@ -162,6 +210,18 @@ function LandingPage() {
     seekers: page.statSeekers,
   }), [page]);
 
+  const signupBannerMessage = useMemo(
+    () => page.bannerSignupMessage.replace(
+      '{count}',
+      formatStatCount(liveStats.seekers ?? 0, { compact: true, plus: true }),
+    ),
+    [liveStats.seekers, page.bannerSignupMessage],
+  );
+
+  const scrollToJobs = () => {
+    document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const translateText = () => {
     const dictionary = translatorDictionary[translateDirection];
     const result = splitWords(sourceText)
@@ -205,7 +265,7 @@ function LandingPage() {
   const handleJobAlertSubscribe = async (event) => {
     event.preventDefault();
     const email = alertEmail.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       showToast(page.jobAlertsInvalid);
       return;
     }
@@ -225,6 +285,44 @@ function LandingPage() {
     } finally {
       setAlertLoading(false);
     }
+  };
+
+  const handleContactSubmit = async (event) => {
+    event.preventDefault();
+    const email = contactEmail.trim();
+    const phone = contactPhone.trim();
+    const message = contactMessage.trim();
+
+    if (!message) {
+      showToast('Please enter a message');
+      return;
+    }
+    if (email && !isValidEmail(email)) {
+      showToast(page.jobAlertsInvalid);
+      return;
+    }
+
+    setContactLoading(true);
+    setContactError('');
+    try {
+      const result = await contactAPI.sendMessage({ email: email || undefined, phone: phone || undefined, message });
+      if (result.success) {
+        setContactSuccess(true);
+        setContactEmail('');
+        setContactPhone('');
+        setContactMessage('');
+      } else {
+        setContactError(result.message || 'Failed to send message. Please try again.');
+      }
+    } catch {
+      setContactError('Failed to send message. Please try again.');
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
+  const dismissContactSuccess = () => {
+    setContactSuccess(false);
   };
 
   const openJobDetails = (jobId) => {
@@ -248,6 +346,14 @@ function LandingPage() {
 
   const handleRequireLogin = (jobId) => {
     handleApply(jobId);
+  };
+
+  const openLegalSection = (section) => {
+    setActiveLegalSection(section);
+  };
+
+  const closeLegalSection = () => {
+    setActiveLegalSection(null);
   };
 
   return (
@@ -339,7 +445,7 @@ function LandingPage() {
                 <div className="badge hero-popular-badge mb-3 rounded-pill px-3 py-2">🔥 Popular today</div>
                 <h2 className="h4 fw-bold">{page.categoriesTitle}</h2>
                 <p className="text-muted">{page.categoriesSubtitle}</p>
-                <div className="row gy-3 mt-3">
+<div className="row gy-3 mt-3">
                   {categories.map((category) => (
                     <div className="col-6" key={category.key}>
                       <div className="category-pill p-3 rounded-4 text-start shadow-sm">
@@ -353,6 +459,7 @@ function LandingPage() {
             </div>
           </div>
         </div>
+
       </header>
 
       <section className="stats-bar py-4">
@@ -370,6 +477,15 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      <LandingBanner
+        variant="signup"
+        eyebrow={page.bannerSignupEyebrow}
+        title={page.bannerSignupTitle}
+        message={signupBannerMessage}
+        ctaLabel={page.bannerSignupCta}
+        ctaTo="/choose-role"
+      />
 
       <main>
         <section className="landing-section container py-5" id="how-it-works">
@@ -398,76 +514,76 @@ function LandingPage() {
 
         <section className="landing-section section-muted py-5" id="jobs">
           <div className="container">
-          <div className="section-header text-center mx-auto mb-5">
-            <p className="section-eyebrow text-uppercase fw-semibold mb-2">{page.categoriesTitle}</p>
-            <h2 className="section-title display-6 fw-bold mb-0">{page.categoriesSubtitle}</h2>
-            <div className="section-title-line mx-auto mt-3" />
-          </div>
+            <div className="section-header text-center mx-auto mb-5">
+              <p className="section-eyebrow text-uppercase fw-semibold mb-2">{page.categoriesTitle}</p>
+              <h2 className="section-title display-6 fw-bold mb-0">{page.categoriesSubtitle}</h2>
+              <div className="section-title-line mx-auto mt-3" />
+            </div>
 
-          <div className="row g-4">
-            {categories.map((category) => (
-              <div className="col-sm-6 col-lg-3" key={category.key}>
-                <div className={`card h-100 border-0 shadow-sm category-card${activeCategoryKey === category.key ? ' category-card-active' : ''}`}>
-                  <div className="card-body text-center p-4">
-                    <div className="category-icon mb-3">{category.icon}</div>
-                    <h5 className="fw-bold">{lang === 'en' ? category.en : category.sw}</h5>
-                    <p className="text-muted small mb-3">Fast listings for on-demand work in this niche.</p>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-warning rounded-pill px-4"
-                      onClick={() => handleCategorySearch(category)}
-                    >
-                      {page.heroButton}
-                    </button>
+            <div className="row g-4">
+              {categories.map((category) => (
+                <div className="col-sm-6 col-lg-3" key={category.key}>
+                  <div className={`card h-100 border-0 shadow-sm category-card${activeCategoryKey === category.key ? ' category-card-active' : ''}`}>
+                    <div className="card-body text-center p-4">
+                      <div className="category-icon mb-3">{category.icon}</div>
+                      <h5 className="fw-bold">{lang === 'en' ? category.en : category.sw}</h5>
+                      <p className="text-muted small mb-3">Fast listings for on-demand work in this niche.</p>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-warning rounded-pill px-4"
+                        onClick={() => handleCategorySearch(category)}
+                      >
+                        {page.heroButton}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {activeCategoryKey && (
-            <div className="mt-5" id="category-jobs">
-              <div className="section-header text-center mx-auto mb-4">
-                <h3 className="section-title fw-bold mb-2">{page.categoryJobsTitle}</h3>
-                <p className="text-muted mb-0">{activeCategoryLabel}</p>
-              </div>
-              {jobsLoading ? (
-                <p className="text-center text-muted py-4">...</p>
-              ) : categoryJobs.length === 0 ? (
-                <p className="text-center text-muted py-4">{page.categoryJobsEmpty}</p>
-              ) : (
-                <div className="row g-4">
-                  {categoryJobs.map((job) => (
-                    <div className="col-md-4" key={job.id}>
-                      <div className="card h-100 border-0 shadow-sm featured-card">
-                        <div className="card-body p-4">
-                          <span className="badge bg-dark mb-3 rounded-pill">{job.jobType}</span>
-                          <button
-                            type="button"
-                            className="landing-job-title-link"
-                            onClick={() => openJobDetails(job.id)}
-                          >
-                            <h5 className="fw-bold mb-2 landing-job-title">{job.title}</h5>
-                          </button>
-                          <p className="text-muted small mb-1">{job.location}</p>
-                          <p className="text-muted mb-3">
-                            {job.employerName ? `${page.seekerPostedBy} ${job.employerName}` : job.pay}
-                          </p>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-warning rounded-pill"
-                            onClick={() => handleApply(job.id)}
-                          >
-                            {page.applyNow}
-                          </button>
+            {activeCategoryKey && (
+              <div className="mt-5" id="category-jobs">
+                <div className="section-header text-center mx-auto mb-4">
+                  <h3 className="section-title fw-bold mb-2">{page.categoryJobsTitle}</h3>
+                  <p className="text-muted mb-0">{activeCategoryLabel}</p>
+                </div>
+                {jobsLoading ? (
+                  <p className="text-center text-muted py-4">...</p>
+                ) : categoryJobs.length === 0 ? (
+                  <p className="text-center text-muted py-4">{page.categoryJobsEmpty}</p>
+                ) : (
+                  <div className="row g-4">
+                    {categoryJobs.map((job) => (
+                      <div className="col-md-4" key={job.id}>
+                        <div className="card h-100 border-0 shadow-sm featured-card">
+                          <div className="card-body p-4">
+                            <span className="badge bg-dark mb-3 rounded-pill">{job.jobType}</span>
+                            <button
+                              type="button"
+                              className="landing-job-title-link"
+                              onClick={() => openJobDetails(job.id)}
+                            >
+                              <h5 className="fw-bold mb-2 landing-job-title">{job.title}</h5>
+                            </button>
+                            <p className="text-muted small mb-1">{job.location}</p>
+                            <p className="text-muted mb-3">
+                              {job.employerName ? `${page.seekerPostedBy} ${job.employerName}` : job.pay}
+                            </p>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-warning rounded-pill"
+                              onClick={() => handleApply(job.id)}
+                            >
+                              {page.applyNow}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -579,8 +695,10 @@ function LandingPage() {
                   <div className="card-body p-4 p-lg-5">
                     <h3 className="h4 fw-bold mb-3">{page.ctaTitle}</h3>
                     <div className="d-grid gap-2">
-                      <button className="btn btn-warning btn-lg fw-semibold rounded-pill">{page.ctaButtonJobSeeker}</button>
-                      <Link to="/login" className="btn btn-outline-warning btn-lg fw-semibold rounded-pill">{page.ctaButtonEmployer}</Link>
+                      <button type="button" className="btn btn-warning btn-lg fw-semibold rounded-pill" onClick={scrollToJobs}>
+                        {page.ctaButtonJobSeeker}
+                      </button>
+                      <Link to="/choose-role" className="btn btn-outline-warning btn-lg fw-semibold rounded-pill">{page.ctaButtonEmployer}</Link>
                     </div>
                   </div>
                 </div>
@@ -588,8 +706,6 @@ function LandingPage() {
             </div>
           </div>
         </section>
-
-        {/* Testimonials section removed as requested — replaced by Proven Results */}
 
         <section className="landing-section job-alerts-section py-5" id="job-alerts">
           <div className="container">
@@ -656,44 +772,170 @@ function LandingPage() {
         </section>
 
         <section className="landing-section container py-5" id="help">
-            <div className="section-header text-center mx-auto mb-5">
-              <p className="section-eyebrow text-uppercase fw-semibold mb-2">{page.faqTitle}</p>
-              <h2 className="section-title display-6 fw-bold mb-0">{page.faqSubtitle}</h2>
-              <div className="section-title-line mx-auto mt-3" />
-            </div>
-            <div className="row justify-content-center">
-              <div className="col-lg-8">
-                <div className="accordion faq-accordion" id="faqAccordion">
-                  {[
-                    { id: 'faq1', q: page.faq1Q, a: page.faq1A },
-                    { id: 'faq2', q: page.faq2Q, a: page.faq2A },
-                    { id: 'faq3', q: page.faq3Q, a: page.faq3A },
-                    { id: 'faq4', q: page.faq4Q, a: page.faq4A },
-                    { id: 'faq5', q: page.faq5Q, a: page.faq5A },
-                  ].map((faq, idx) => (
-                    <div className="accordion-item border-0 shadow-sm mb-3 rounded-3 overflow-hidden" key={faq.id}>
-                      <h3 className="accordion-header">
-                        <button
-                          className={`accordion-button fw-semibold${idx !== 0 ? ' collapsed' : ''}`}
-                          type="button"
-                          data-bs-toggle="collapse"
-                          data-bs-target={`#${faq.id}`}
-                          aria-expanded={idx === 0}
-                          aria-controls={faq.id}
-                        >
-                          {faq.q}
-                        </button>
-                      </h3>
-                      <div id={faq.id} className={`accordion-collapse collapse${idx === 0 ? ' show' : ''}`} data-bs-parent="#faqAccordion">
-                        <div className="accordion-body text-muted">{faq.a}</div>
-                      </div>
+          <div className="section-header text-center mx-auto mb-5">
+            <p className="section-eyebrow text-uppercase fw-semibold mb-2">{page.faqTitle}</p>
+            <h2 className="section-title display-6 fw-bold mb-0">{page.faqSubtitle}</h2>
+            <div className="section-title-line mx-auto mt-3" />
+          </div>
+          <div className="row justify-content-center">
+            <div className="col-lg-8">
+              <div className="accordion faq-accordion" id="faqAccordion">
+                {[
+                  { id: 'faq1', q: page.faq1Q, a: page.faq1A },
+                  { id: 'faq2', q: page.faq2Q, a: page.faq2A },
+                  { id: 'faq3', q: page.faq3Q, a: page.faq3A },
+                  { id: 'faq4', q: page.faq4Q, a: page.faq4A },
+                  { id: 'faq5', q: page.faq5Q, a: page.faq5A },
+                ].map((faq, idx) => (
+                  <div className="accordion-item border-0 shadow-sm mb-3 rounded-3 overflow-hidden" key={faq.id}>
+                    <h3 className="accordion-header">
+                      <button
+                        className={`accordion-button fw-semibold${idx !== 0 ? ' collapsed' : ''}`}
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target={`#${faq.id}`}
+                        aria-expanded={idx === 0}
+                        aria-controls={faq.id}
+                      >
+                        {faq.q}
+                      </button>
+                    </h3>
+                    <div id={faq.id} className={`accordion-collapse collapse${idx === 0 ? ' show' : ''}`} data-bs-parent="#faqAccordion">
+                      <div className="accordion-body text-muted">{faq.a}</div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="about-section landing-section py-5" id="about">
+          <div className="container">
+            <div className="about-section-shell">
+              <div className="about-section-intro text-center mx-auto">
+                <p className="section-eyebrow text-uppercase fw-semibold mb-2">{page.footerAbout}</p>
+                <h2 className="section-title display-6 fw-bold mb-3">{page.aboutTitle}</h2>
+                <p className="about-section-lead text-muted mb-0">{page.aboutSubtitle}</p>
+                <div className="section-title-line mx-auto mt-3" />
+              </div>
+              <div className="about-section-grid">
+                {page.aboutSections.map((section, idx) => (
+                  <article className="about-section-card" key={section.heading}>
+                    <span className="about-section-number">{String(idx + 1).padStart(2, '0')}</span>
+                    <h3 className="about-section-card-title">{section.heading}</h3>
+                    <p className="about-section-card-text mb-0">{section.body}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <section className="contact-section landing-section py-5" id="contact">
+        <div className="container">
+          <div className="section-header text-center mx-auto mb-5">
+            <p className="section-eyebrow text-uppercase fw-semibold mb-2">{page.contactTitle}</p>
+            <h2 className="section-title display-6 fw-bold mb-0">{page.contactSubtitle}</h2>
+            <div className="section-title-line mx-auto mt-3" />
+          </div>
+          <div className="row g-4 justify-content-center align-items-stretch">
+            <div className="col-lg-4">
+              <div className="contact-info-card p-4 p-lg-5 rounded-4 shadow-sm h-100">
+                <h5 className="fw-bold mb-4">{page.contactTitle}</h5>
+                <a href={`mailto:${page.contactEmailValue}`} className="contact-info-link d-flex align-items-center mb-3 text-decoration-none">
+                  <div className="contact-icon-wrapper me-3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <small className="text-muted d-block">{page.contactEmailLabel}</small>
+                    <span className="fw-semibold contact-link-text">{page.contactEmailValue}</span>
+                  </div>
+                </a>
+                <a href={`tel:${page.contactPhoneValue}`} className="contact-info-link d-flex align-items-center text-decoration-none">
+                  <div className="contact-icon-wrapper me-3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.04 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.04-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <small className="text-muted d-block">{page.contactPhoneLabel}</small>
+                    <span className="fw-semibold contact-link-text">{page.contactPhoneValue}</span>
+                  </div>
+                </a>
+              </div>
+            </div>
+            <div className="col-lg-6">
+              <div className="card border-0 shadow-sm contact-form-card rounded-4 h-100">
+                <div className="card-body p-4 p-lg-5 d-flex flex-column">
+                  <h5 className="fw-bold mb-2">{page.contactSendTitle}</h5>
+                  <p className="text-muted small mb-4">{page.contactSendSubtitle}</p>
+                  {contactSuccess ? (
+                    <ContactSuccessBox page={page} onDone={dismissContactSuccess} />
+                  ) : (
+                    <form className="contact-form flex-grow-1 d-flex flex-column" onSubmit={handleContactSubmit} noValidate autoComplete="off">
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="form-label contact-form-label" htmlFor="contact-email">
+                            {page.contactFormEmail}
+                            <small className="text-muted fw-normal"> ({page.contactFormEmailOptional})</small>
+                          </label>
+                          <input
+                            id="contact-email"
+                            type="email"
+                            className="form-control form-control-lg contact-form-input"
+                            placeholder={page.contactFormEmailPlaceholder}
+                            value={contactEmail}
+                            onChange={(e) => setContactEmail(e.target.value)}
+                          />
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label contact-form-label" htmlFor="contact-phone">
+                            {page.contactFormPhone}
+                            <small className="text-muted fw-normal"> ({page.contactFormPhoneOptional})</small>
+                          </label>
+                          <input
+                            id="contact-phone"
+                            type="tel"
+                            className="form-control form-control-lg contact-form-input"
+                            placeholder={page.contactFormPhonePlaceholder}
+                            value={contactPhone}
+                            onChange={(e) => setContactPhone(e.target.value)}
+                          />
+                        </div>
+                        <div className="col-12">
+                          <label className="form-label contact-form-label" htmlFor="contact-message">{page.contactFormMessage}</label>
+                          <textarea
+                            id="contact-message"
+                            className="form-control contact-form-input contact-form-textarea"
+                            rows="5"
+                            placeholder={page.contactFormMessagePlaceholder}
+                            value={contactMessage}
+                            onChange={(e) => setContactMessage(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      {contactError && <p className="text-danger small mt-3 mb-0">{contactError}</p>}
+                      <button
+                        type="submit"
+                        className="btn btn-warning btn-lg fw-semibold rounded-pill w-100 mt-4"
+                        disabled={contactLoading}
+                      >
+                        {contactLoading ? '...' : page.contactFormSubmit}
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>
-        </section>
-      </main>
+          </div>
+        </div>
+      </section>
 
       <footer className="site-footer">
         <div className="footer-top py-5">
@@ -704,7 +946,8 @@ function LandingPage() {
                   <span className="brand-icon me-2">SJ</span>
                   {page.brand}
                 </h5>
-                <p className="footer-tagline mb-4">{page.footerTagline}</p>
+                <p className="footer-tagline mb-2">{page.footerTagline}</p>
+                <p className="footer-subtagline mb-4">{page.footerSubtagline}</p>
                 <div className="social-links d-flex gap-2">
                   <a href="https://www.facebook.com/SmartJobKenya" target="_blank" rel="noopener noreferrer" className="social-link" aria-label="Facebook" data-label="Facebook">
                     <span className="social-icon">f</span>
@@ -740,8 +983,8 @@ function LandingPage() {
                 <h6 className="footer-heading text-white fw-semibold mb-3">{page.footerCompanies}</h6>
                 <ul className="list-unstyled footer-links">
                   <li><a href="#employers">{page.footerCompanies}</a></li>
-                  <li><a href="#">{page.footerAbout}</a></li>
-                  <li><a href="#">{page.footerContact}</a></li>
+                  <li><a href="#about">{page.footerAbout}</a></li>
+                  <li><a href="#contact">{page.footerContact}</a></li>
                 </ul>
               </div>
 
@@ -749,9 +992,25 @@ function LandingPage() {
                 <h6 className="footer-heading text-white fw-semibold mb-3">{page.navHelp}</h6>
                 <ul className="list-unstyled footer-links">
                   <li><a href="#help">{page.footerHelp}</a></li>
-                  <li><a href="#">{page.footerPrivacy}</a></li>
-                  <li><a href="#">{page.footerTerms}</a></li>
-                  <li><a href="#">{page.footerCookies}</a></li>
+                  <li>
+                    <button type="button" className="footer-link-btn" onClick={() => openLegalSection('privacy')}>
+                      {page.footerPrivacy}
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" className="footer-link-btn" onClick={() => openLegalSection('terms')}>
+                      {page.footerTerms}
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      className="footer-link-btn"
+                      onClick={() => window.dispatchEvent(new Event(OPEN_COOKIES_EVENT))}
+                    >
+                      {page.footerCookies}
+                    </button>
+                  </li>
                 </ul>
               </div>
 
@@ -794,6 +1053,12 @@ function LandingPage() {
         session={session?.role === 'seeker' ? session : null}
         autoOpenApply={openApplyOnSelect}
         onRequireLogin={handleRequireLogin}
+      />
+
+      <LandingLegalSection
+        page={page}
+        activeSection={activeLegalSection}
+        onClose={closeLegalSection}
       />
     </div>
   );

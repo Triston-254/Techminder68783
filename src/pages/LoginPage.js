@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import AuthEmailInput from '../components/AuthEmailInput';
 import AuthLayout from '../components/AuthLayout';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { getDashboardPath } from '../utils/dashboard';
 import { authAPI } from '../utils/api';
+import { isValidEmail } from '../utils/validation';
+import { initSessionActivity, getSession } from '../utils/sessionActivity';
 
 function LoginPage() {
   const { page } = useLanguage();
@@ -14,13 +17,20 @@ function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState('');
 
   useEffect(() => {
     const state = location.state;
     if (!state) return;
 
+    if (state.sessionExpired) {
+      setSessionNotice(page.loginSessionExpired);
+      const storedSession = getSession();
+      if (storedSession?.email) setEmail(storedSession.email);
+    }
     if (state.signupSuccess) {
       showToast(page.signupSuccess);
     }
@@ -32,14 +42,31 @@ function LoginPage() {
 
     const preservedState = state.jobId
       ? { returnTo: state.returnTo, jobId: state.jobId, openApply: state.openApply }
-      : null;
+      : state.returnTo
+        ? { returnTo: state.returnTo, sessionExpired: state.sessionExpired }
+        : null;
 
     navigate(location.pathname, { replace: true, state: preservedState });
   }, [location, navigate, page, showToast]);
 
+  const showError = (message) => {
+    setErrorKey((current) => current + 1);
+    setError(message);
+  };
+
+  const clearError = () => {
+    setError((current) => (current ? '' : current));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!isValidEmail(email)) {
+      showError(page.authEmailInvalid);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -52,6 +79,7 @@ function LoginPage() {
           role: result.user.role,
           profilePicture: result.user.profilePicture || null,
         }));
+        initSessionActivity();
 
         const redirect = location.state;
         if (redirect?.jobId && redirect?.returnTo) {
@@ -63,15 +91,17 @@ function LoginPage() {
               state: { jobId: redirect.jobId, openApply: redirect.openApply },
             });
           }
+        } else if (redirect?.returnTo) {
+          navigate(redirect.returnTo, { replace: true });
         } else {
           navigate(getDashboardPath(result.user.role || 'seeker'));
         }
       } else {
-        setError(result.message || 'Login failed');
+        showError(result.message || 'Login failed');
       }
     } catch {
       setLoading(false);
-      setError('Connection error. Please try again.');
+      showError('Connection error. Please try again.');
     }
   };
 
@@ -87,24 +117,27 @@ function LoginPage() {
       </Link>
     }>
       <form onSubmit={handleSubmit} className="auth-form" noValidate autoComplete="off">
-        {error && <div className="alert alert-danger auth-alert rounded-3 py-2">{error}</div>}
+        {sessionNotice && (
+          <div className="alert alert-warning auth-alert rounded-3 py-2 small mb-3" role="status">
+            {sessionNotice}
+          </div>
+        )}
 
-        <div className="mb-3">
-          <label htmlFor="login-email" className="form-label auth-label">{page.loginEmail}</label>
-          <input
-            id="login-email"
-            name="sjk-login-email"
-            type="email"
-            className="form-control form-control-lg auth-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onFocus={unlockField}
-            placeholder="Input email"
-            required
-            autoComplete="off"
-            readOnly
-          />
-        </div>
+        <AuthEmailInput
+          id="login-email"
+          name="sjk-login-email"
+          label={page.loginEmail}
+          value={email}
+          onChange={(e) => {
+            clearError();
+            setEmail(e.target.value);
+          }}
+          onFocus={unlockField}
+          placeholder={page.authPlaceholderEmail}
+          required
+          autoComplete="off"
+          readOnly
+        />
 
         <div className="mb-3">
           <label htmlFor="login-password" className="form-label auth-label">{page.loginPassword}</label>
@@ -115,9 +148,12 @@ function LoginPage() {
               type={showPassword ? 'text' : 'password'}
               className="form-control form-control-lg auth-input auth-input-with-toggle"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                clearError();
+                setPassword(e.target.value);
+              }}
               onFocus={unlockField}
-              placeholder="Input password"
+              placeholder={page.authPlaceholderPassword}
               required
               autoComplete="off"
               minLength={8}
@@ -145,6 +181,12 @@ function LoginPage() {
             </button>
           </div>
         </div>
+
+        {error && (
+          <div key={errorKey} className="alert alert-danger auth-alert auth-alert-error rounded-3 py-2 mb-3" role="alert">
+            {error}
+          </div>
+        )}
 
         <button type="submit" className="btn btn-warning btn-lg w-100 auth-submit-btn rounded-pill fw-semibold mt-2" disabled={loading}>
           {loading ? '...' : page.loginButton}

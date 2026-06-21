@@ -1,3 +1,4 @@
+import SessionExpiredPrompt from '../components/SessionExpiredPrompt';
 import EmployerHeader from '../components/EmployerHeader';
 import SiteFooter from '../components/SiteFooter';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,7 +9,7 @@ import '../App.css';
 function EmployerSettingsPage() {
   const { page } = useLanguage();
   const { theme, setTheme } = useTheme();
-  const { session, user, logout, ready } = useEmployerSession();
+  const { session, user, logout, ready, sessionExpired } = useEmployerSession();
 
   if (!ready) return null;
 
@@ -53,6 +54,7 @@ function EmployerSettingsPage() {
       </main>
 
       <SiteFooter compact />
+      {sessionExpired && <SessionExpiredPrompt />}
     </div>
   );
 }

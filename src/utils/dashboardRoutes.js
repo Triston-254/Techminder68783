@@ -9,3 +9,7 @@ export const SEEKER_ROUTES = {
   profile: '/job-seeker/profile',
   settings: '/job-seeker/settings',
 };
+
+export const ADMIN_ROUTES = {
+  dashboard: '/admin-dashboard',
+};
