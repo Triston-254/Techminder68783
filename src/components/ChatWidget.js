@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { chatAPI } from '../utils/api';
 import './ChatWidget.css';
 
-const CHAT_ROUTE_PATTERN = /^\/(employer-dashboard|employer\/|job-seeker)/;
+const CHAT_ROUTE_PATTERN = /^\/(employer-dashboard|employer\/|job-seeker|admin-dashboard)(\/|$)/;
 
 function isChatRoute(pathname) {
   return CHAT_ROUTE_PATTERN.test(pathname);
