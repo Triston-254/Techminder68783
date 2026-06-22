@@ -1,18 +1,53 @@
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+function getApiBase() {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return (process.env.REACT_APP_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    }
+    // Deployed sites always use same-origin Vercel proxy (avoids CORS).
+    return '/api';
+  }
+
+  return (process.env.REACT_APP_API_URL || '/api').replace(/\/$/, '');
+}
+
+export { getApiBase };
+export const API_BASE = '/api';
+
+function requestHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (getApiBase().includes('ngrok')) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+  }
+  return headers;
+}
 
 async function parseResponse(response) {
   const text = await response.text();
+  if (!text) {
+    throw new Error(`Backend returned an empty response (${response.status}). Check that InfinityFree hosting is online.`);
+  }
+
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    if (data?.message === 'Server error' && data?.errorMessage) {
+      data.message = data.errorMessage;
+    }
+    return data;
   } catch {
-    throw new Error(text || `Request failed (${response.status})`);
+    const preview = text.replace(/\s+/g, ' ').trim().slice(0, 140);
+    throw new Error(
+      preview.startsWith('<')
+        ? `Backend is not responding correctly (${response.status}). Open https://tech453.infinityfree.me/backend/index.php in your browser to verify hosting is active.`
+        : `Invalid backend response (${response.status}): ${preview}`
+    );
   }
 }
 
 export async function apiRequest(endpoint, data) {
-  const response = await fetch(`${API_BASE}/auth.php?action=${endpoint}`, {
+  const response = await fetch(`${getApiBase()}/auth.php?action=${endpoint}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action: endpoint, ...data }),
   });
@@ -20,9 +55,9 @@ export async function apiRequest(endpoint, data) {
 }
 
 async function jobsRequest(action, data = {}) {
-  const response = await fetch(`${API_BASE}/jobs.php?action=${action}`, {
+  const response = await fetch(`${getApiBase()}/jobs.php?action=${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
@@ -30,9 +65,9 @@ async function jobsRequest(action, data = {}) {
 }
 
 async function notificationsRequest(action, data = {}) {
-  const response = await fetch(`${API_BASE}/notifications.php?action=${action}`, {
+  const response = await fetch(`${getApiBase()}/notifications.php?action=${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
@@ -40,9 +75,9 @@ async function notificationsRequest(action, data = {}) {
 }
 
 async function adminRequest(action, data = {}) {
-  const response = await fetch(`${API_BASE}/admin.php?action=${action}`, {
+  const response = await fetch(`${getApiBase()}/admin.php?action=${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
@@ -103,18 +138,18 @@ export const adminAPI = {
 };
 
 export const adminJobsAPI = {
-  closeJob: (data) => fetch(`${API_BASE}/admin_job_actions.php?action=admin_close_job`, {
+  closeJob: (data) => fetch(`${getApiBase()}/admin_job_actions.php?action=admin_close_job`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify(data),
   }).then(parseResponse),
 };
 
 async function subscriptionsRequest(action, data = {}) {
-  const response = await fetch(`${API_BASE}/subscriptions.php?action=${action}`, {
+  const response = await fetch(`${getApiBase()}/subscriptions.php?action=${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
@@ -126,9 +161,9 @@ export const subscriptionsAPI = {
 };
 
 async function chatRequest(action, data = {}) {
-  const response = await fetch(`${API_BASE}/chat.php?action=${action}`, {
+  const response = await fetch(`${getApiBase()}/chat.php?action=${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
@@ -141,9 +176,9 @@ export const chatAPI = {
 };
 
 async function contactRequest(action, data = {}) {
-  const response = await fetch(`${API_BASE}/contact.php?action=${action}`, {
+  const response = await fetch(`${getApiBase()}/contact.php?action=${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(),
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
