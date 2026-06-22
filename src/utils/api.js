@@ -62,6 +62,7 @@ async function jobsRequest(action, data = {}) {
     credentials: 'include',
     body: JSON.stringify({ action, ...data }),
   });
+
   return parseResponse(response);
 }
 
