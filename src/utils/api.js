@@ -55,6 +55,7 @@ export async function apiRequest(endpoint, data) {
 }
 
 async function jobsRequest(action, data = {}) {
+  // backend/jobs.php only allows POST. Ensure we always send POST.
   const response = await fetch(`${getApiBase()}/jobs.php?action=${action}`, {
     method: 'POST',
     headers: requestHeaders(),
@@ -63,6 +64,7 @@ async function jobsRequest(action, data = {}) {
   });
   return parseResponse(response);
 }
+
 
 async function notificationsRequest(action, data = {}) {
   const response = await fetch(`${getApiBase()}/notifications.php?action=${action}`, {
