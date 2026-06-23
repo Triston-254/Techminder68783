@@ -32,6 +32,15 @@ async function parseResponse(response) {
   const contentType = response.headers?.get?.('content-type') || '';
   const looksLikeHtml = text.trimStart().startsWith('<') || contentType.includes('text/html');
 
+  // Helpful debug details to show the *actual* response coming back.
+  // (This makes it obvious if the request is hitting an HTML 404/403 page.)
+  const debugDetails = {
+    status: response.status,
+    url: response.url,
+    contentType,
+  };
+
+
   try {
     const data = JSON.parse(text);
     if (data?.message === 'Server error' && data?.errorMessage) {
