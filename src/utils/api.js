@@ -28,21 +28,32 @@ async function parseResponse(response) {
     throw new Error(`Backend returned an empty response (${response.status}). Check that InfinityFree hosting is online.`);
   }
 
+  // Many proxy/rewrite failures return HTML pages; avoid masking them as generic JSON errors.
+  const contentType = response.headers?.get?.('content-type') || '';
+  const looksLikeHtml = text.trimStart().startsWith('<') || contentType.includes('text/html');
+
   try {
     const data = JSON.parse(text);
     if (data?.message === 'Server error' && data?.errorMessage) {
       data.message = data.errorMessage;
     }
     return data;
-  } catch {
-    const preview = text.replace(/\s+/g, ' ').trim().slice(0, 140);
+  } catch (e) {
+    const preview = text.replace(/\s+/g, ' ').trim().slice(0, 220);
+    if (looksLikeHtml) {
+      throw new Error(
+        `Backend returned HTML instead of JSON (${response.status}). ` +
+          `This usually means your /api rewrite is routing to the frontend (or a 404/403 page). ` +
+          `Preview: ${preview}`
+      );
+    }
+
     throw new Error(
-      preview.startsWith('<')
-        ? `Backend is not responding correctly (${response.status}). Open https://tech453.infinityfree.me/backend/index.php in your browser to verify hosting is active.`
-        : `Invalid backend response (${response.status}): ${preview}`
+      `Invalid backend response (${response.status}). ${e instanceof Error ? e.message : 'Unknown parse error'}: ${preview}`
     );
   }
 }
+
 
 export async function apiRequest(endpoint, data) {
   const response = await fetch(`${getApiBase()}/auth.php?action=${endpoint}`, {
