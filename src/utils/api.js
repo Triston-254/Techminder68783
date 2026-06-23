@@ -1,18 +1,20 @@
 function getApiBase() {
+  const configuredBase = process.env.REACT_APP_API_URL?.replace(/\/$/, '');
+
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
-      return (process.env.REACT_APP_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+      return configuredBase || 'http://localhost:8000';
     }
-    // Deployed sites always use same-origin Vercel proxy (avoids CORS).
-    return '/api';
+
+    return configuredBase || '/api';
   }
 
-  return (process.env.REACT_APP_API_URL || '/api').replace(/\/$/, '');
+  return configuredBase || '/api';
 }
 
 export { getApiBase };
-export const API_BASE = '/api';
+export const API_BASE = getApiBase();
 
 function requestHeaders() {
   const headers = { 'Content-Type': 'application/json' };
